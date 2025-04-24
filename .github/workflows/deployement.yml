@@ -1,0 +1,43 @@
+
+name: SafeChild Deployment
+
+on:
+  push:
+    branches:
+      - main       
+      - staging    
+      - dev       
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+    
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Build
+      run: npm run build
+      
+    - name: Deploy to Environment
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        case $GITHUB_REF in
+          refs/heads/dev)
+            npm run deploy-dev
+            ;;
+          refs/heads/staging)
+            npm run deploy-staging
+            ;;
+          refs/heads/main)
+            npm run deploy-prod
+            ;;
+        esac
