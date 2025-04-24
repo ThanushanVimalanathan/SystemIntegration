@@ -1,0 +1,32 @@
+name: CI Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-type: [unit, integration, e2e]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Build Docker image
+        run: docker-compose -f docker-compose.yml build
+        
+      - name: Run tests
+        run: |
+          docker-compose -f docker-compose.yml run --rm childpreventwebsite npm run test:${{ matrix.test-type }}
