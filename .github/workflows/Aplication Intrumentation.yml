@@ -1,0 +1,19 @@
+// Node.js tracing setup
+const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
+const { JaegerExporter } = require('@opentelemetry/exporter-jaeger');
+const { Resource } = require('@opentelemetry/resources');
+const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
+
+const provider = new NodeTracerProvider({
+  resource: new Resource({
+    [SemanticResourceAttributes.SERVICE_NAME]: 'childprevent-website'
+  })
+});
+
+provider.addSpanProcessor(new SimpleSpanProcessor(
+  new JaegerExporter({
+    endpoint: 'http://jaeger:14268/api/traces'
+  })
+));
+
+provider.register();
