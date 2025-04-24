@@ -1,0 +1,45 @@
+# .github/workflows/security.yml
+name: Security Scanning
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 1' # Weekly scans
+
+jobs:
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Run SonarQube Scan
+      uses: SonarSource/sonarqube-scan-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+    
+  sca:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Run Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'SafeChild'
+        format: 'HTML'
+        fail_on_cvss: 7
+        additional_arguments: '--scan **/src'
+    
+  dast:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: OWASP ZAP Scan
+      uses: zaproxy/action-full-scan@v0.4.0
+      with:
+        target: 'https://safechild.example.com'
+        rules_file_name: 'safechild.rules'
+        fail_action: true
+        severity: 'HIGH'
