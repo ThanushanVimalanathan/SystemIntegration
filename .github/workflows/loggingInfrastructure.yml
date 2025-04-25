@@ -1,0 +1,62 @@
+name: Observability Stack Deployment
+
+on:
+  workflow_dispatch:  # Manual trigger
+  schedule:
+    - cron: '0 0 * * *'  # Daily maintenance window
+
+env:
+  PROMETHEUS_VERSION: "v2.47.0"
+  GRAFANA_VERSION: "10.2.0"
+  LOKI_VERSION: "2.9.1"
+  TEMPO_VERSION: "2.3.0"
+  OPENTELEMETRY_VERSION: "0.88.0"
+
+jobs:
+  deploy-observability:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Distributed Tracing Setup (Tempo + OpenTelemetry)
+      - name: Deploy Tempo distributed tracing
+        run: |
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm upgrade --install tempo grafana/tempo \
+            --version ${{ env.TEMPO_VERSION }} \
+            --set serviceMonitor.enabled=true \
+            --set metricsGenerator.enabled=true
+
+      # Logging Infrastructure (Loki + Promtail)
+      - name: Deploy Loki logging stack
+        run: |
+          helm upgrade --install loki grafana/loki \
+            --version ${{ env.LOKI_VERSION }} \
+            --set loki.auth_enabled=false \
+            --set promtail.enabled=true
+
+      # Metrics and SLO Monitoring (Prometheus + Grafana)
+      - name: Deploy Prometheus with custom SLOs
+        run: |
+          helm upgrade --install prometheus prometheus-community/prometheus \
+            --version ${{ env.PROMETHEUS_VERSION }} \
+            --set server.global.scrape_interval=15s \
+            --values ./monitoring/slo-recording-rules.yaml
+
+      # Alerting Configuration
+      - name: Configure Alertmanager
+        run: |
+          kubectl apply -f ./monitoring/alert-rules/
+          kubectl apply -f ./monitoring/incident-response/priority-levels.yaml
+
+      # Synthetic Monitoring (Grafana Synthetic Monitoring)
+      - name: Deploy synthetic checks
+        run: |
+          grafana-cli --pluginUrl https://github.com/grafana/synthetic-monitoring-app/releases/download/v0.18.0/synthetic-monitoring-app.zip plugins install synthetic-monitoring-app
+          kubectl apply -f ./monitoring/synthetic-checks/critical-journeys.yaml
+
+      # Verification
+      - name: Run validation tests
+        run: |
+          ./scripts/verify-observability.sh
